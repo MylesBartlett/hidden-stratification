@@ -47,7 +47,9 @@
         "model": "gmm",
         "metric_types": [
             "mean_loss",
-            "composition"
+            "composition",
+            "ari",
+            "nmi"
         ],
         "search_k": true,
         "overcluster": true,

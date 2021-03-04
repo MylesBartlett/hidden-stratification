@@ -92,22 +92,16 @@ class GEORGEHarness:
         # (1) Train initial representation
         self.logger.basic_info("Training initial representation step (1/3)...")
         state_dict = deepcopy(model.state_dict())
-        erm_dir = self.classify(
-            config["classification_config"], model, dataloaders, "erm"
-        )
+        erm_dir = self.classify(config["classification_config"], model, dataloaders, "erm")
         outputs.append(erm_dir)
 
         self.logger.basic_info("Running reduction step (2/3)...")
-        reduction_dir = self.reduce(
-            config, inputs_path=os.path.join(erm_dir, "outputs.pt")
-        )
+        reduction_dir = self.reduce(config, inputs_path=os.path.join(erm_dir, "outputs.pt"))
         outputs.append(reduction_dir)
 
         # (2) cluster
         self.logger.basic_info("Running cluster step (2/3)...")
-        cluster_dir = self.cluster(
-            config, inputs_path=os.path.join(reduction_dir, "outputs.pt")
-        )
+        cluster_dir = self.cluster(config, inputs_path=os.path.join(reduction_dir, "outputs.pt"))
         outputs.append(cluster_dir)
 
         # (3) DRO
@@ -183,9 +177,7 @@ class GEORGEHarness:
             or classification_config["save_act_only"]
             or classification_config["bit_pretrained"]
         ):
-            trainer.train(
-                model, dataloaders["train"], dataloaders["val"], robust=robust
-            )
+            trainer.train(model, dataloaders["train"], dataloaders["val"], robust=robust)
 
         # (2) evaluate
         split_to_outputs = {}
@@ -218,12 +210,8 @@ class GEORGEHarness:
         return save_dir
 
     def reduce(self, reduction_config, reduction_model, inputs_path):
-        save_dir = os.path.join(
-            os.path.dirname(inputs_path), f"reduce_{get_unique_str()}"
-        )
-        self._save_config(
-            save_dir, reduction_config, msg="Saving reduction step config"
-        )
+        save_dir = os.path.join(os.path.dirname(inputs_path), f"reduce_{get_unique_str()}")
+        self._save_config(save_dir, reduction_config, msg="Saving reduction step config")
         inputs = torch.load(inputs_path)
         assert (
             len(set(inputs.keys()) & {"train", "val", "test"}) == 3
@@ -234,9 +222,7 @@ class GEORGEHarness:
             ), f'{split} split of loaded inputs must have ["superclass", "activations"] keys'
 
         # apply dimensionality reduction (if specified) to the data
-        reducer = GEORGEReducer(
-            reduction_config, save_dir=save_dir, log_format=self.log_format
-        )
+        reducer = GEORGEReducer(reduction_config, save_dir=save_dir, log_format=self.log_format)
         group_to_models, train_means = reducer.train(reduction_model, inputs)
 
         split_to_outputs = {}
@@ -287,9 +273,7 @@ class GEORGEHarness:
             save_dir(str). subdirectory within `exp_dir` that contains the cluster
                 assignments, other cluster output, and cluster metrics.
         """
-        save_dir = os.path.join(
-            os.path.dirname(inputs_path), f"cluster_{get_unique_str()}"
-        )
+        save_dir = os.path.join(os.path.dirname(inputs_path), f"cluster_{get_unique_str()}")
         self._save_config(save_dir, cluster_config, msg="Saving cluster step config")
         inputs = torch.load(inputs_path)
         assert (
@@ -303,9 +287,7 @@ class GEORGEHarness:
                 )
 
         # (1) train
-        c_trainer = GEORGECluster(
-            cluster_config, save_dir=save_dir, log_format=self.log_format
-        )
+        c_trainer = GEORGECluster(cluster_config, save_dir=save_dir, log_format=self.log_format)
         group_to_models = c_trainer.train(cluster_model, inputs)
 
         # (2) evaluate
@@ -317,20 +299,17 @@ class GEORGEHarness:
             split_to_outputs[split] = outputs
 
         # (3) save everything
+        wandb.log(split_to_metrics)
         self._save_json(os.path.join(save_dir, "metrics.json"), split_to_metrics)
         self._save_torch(os.path.join(save_dir, "outputs.pt"), split_to_outputs)
         # save assignments only
-        split_to_assignments = {
-            k: v["assignments"] for k, v in split_to_outputs.items()
-        }
+        split_to_assignments = {k: v["assignments"] for k, v in split_to_outputs.items()}
         self._save_torch(os.path.join(save_dir, "clusters.pt"), split_to_assignments)
         group_to_k = {
             group: get_k_from_model(cluster_model)
             for group, cluster_model in enumerate(group_to_models)
         }
-        self._save_cluster_visualizations(
-            save_dir, inputs, group_to_k, split_to_outputs, c_trainer
-        )
+        self._save_cluster_visualizations(save_dir, inputs, group_to_k, split_to_outputs, c_trainer)
         return save_dir
 
     def _get_robust_status(self, mode):
@@ -345,9 +324,7 @@ class GEORGEHarness:
             + '"erm"]'
         )
 
-    def get_dataloaders(
-        self, config, mode="erm", transforms=None, subclass_labels=None
-    ):
+    def get_dataloaders(self, config, mode="erm", transforms=None, subclass_labels=None):
         dataset_name = config["dataset"]
         seed = config["seed"]
         config = config["classification_config"]
@@ -409,25 +386,17 @@ class GEORGEHarness:
                         dataset, **shared_dl_args, shuffle=False, sampler=sampler
                     )
                 else:
-                    dataloaders[split] = DataLoader(
-                        dataset, **shared_dl_args, shuffle=True
-                    )
+                    dataloaders[split] = DataLoader(dataset, **shared_dl_args, shuffle=True)
             else:
                 # Evaluation dataloaders (including for the training set) are "clean" - no data augmentation or shuffling
-                dataset = dataset_class(
-                    root="./data", split=key, **config["dataset_config"]
-                )
+                dataset = dataset_class(root="./data", split=key, **config["dataset_config"])
                 dataset.add_subclass_labels(split_subclass_labels, seed=seed)
-                dataloaders[split] = DataLoader(
-                    dataset, **shared_dl_args, shuffle=False
-                )
+                dataloaders[split] = DataLoader(dataset, **shared_dl_args, shuffle=False)
 
             self.logger.info(f"{split} split:")
             # log class counts for each label type
             for label_type, labels in dataset.Y_dict.items():
-                self.logger.info(
-                    f"{label_type.capitalize()} counts: {np.bincount(labels)}"
-                )
+                self.logger.info(f"{label_type.capitalize()} counts: {np.bincount(labels)}")
 
         return dataloaders
 
@@ -436,14 +405,10 @@ class GEORGEHarness:
             dataset.get_class_counts("subclass"),
             dataset.get_labels("subclass"),
         )
-        group_weights = np.array(
-            [len(dataset) / c if c != 0 else 0 for c in group_counts]
-        )
+        group_weights = np.array([len(dataset) / c if c != 0 else 0 for c in group_counts])
         group_weights /= np.sum(group_weights)
         weights = group_weights[np.array(group_labels)]
-        sampler = WeightedRandomSampler(
-            weights, num_samples=len(dataset), replacement=True
-        )
+        sampler = WeightedRandomSampler(weights, num_samples=len(dataset), replacement=True)
         return sampler, group_weights
 
     def get_nn_model(self, config, num_classes, mode="erm"):
@@ -490,9 +455,7 @@ class GEORGEHarness:
             base_reduction_model = reduction.UMAPReducer(
                 random_state=config["seed"], n_components=red_config["components"]
             )
-            reduction_model = reduction.HardnessAugmentedReducer(
-                nn_model, base_reduction_model
-            )
+            reduction_model = reduction.HardnessAugmentedReducer(nn_model, base_reduction_model)
         return reduction_model
 
     def get_cluster_model(self, config):
@@ -506,16 +469,12 @@ class GEORGEHarness:
             "search": cluster_config["search_k"],
         }
         if cluster_config["overcluster"]:
-            cluster_model = OverclusterModel(
-                **kwargs, oc_fac=cluster_config["overcluster_factor"]
-            )
+            cluster_model = OverclusterModel(**kwargs, oc_fac=cluster_config["overcluster_factor"])
         else:
             cluster_model = AutoKMixtureModel(**kwargs)
         return cluster_model
 
-    def _save_cluster_visualizations(
-        self, save_dir, inputs, group_to_k, split_to_outputs, trainer
-    ):
+    def _save_cluster_visualizations(self, save_dir, inputs, group_to_k, split_to_outputs, trainer):
         """Generates and saves cluster visualizations."""
         for split, outputs in split_to_outputs.items():
             visualization_dir = os.path.join(save_dir, "visualizations", split)

@@ -480,7 +480,7 @@ class GEORGEClassification:
                 bar.set_postfix(
                     {**metrics, **{k: v.avg for k, v in metric_meters.items()}}
                 )
-                bar, update()
+                bar.update()
         if progress:
             bar.close()
         if activations_handle:

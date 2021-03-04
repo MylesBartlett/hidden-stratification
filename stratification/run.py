@@ -26,7 +26,7 @@ def main():
         dir=str(local_dir),
         config=config,
         reinit=True,
-        group=config.get("group", config["datasets"]),
+        group=config.get("group", config["dataset"]),
     )
     torch.multiprocessing.set_sharing_strategy("file_system")
     harness = GEORGEHarness(config, use_cuda=use_cuda)

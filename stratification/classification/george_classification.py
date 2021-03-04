@@ -398,9 +398,9 @@ class GEORGEClassification:
                     loss_targets = targets["superclass"]
                     if bit_pretrained:
                         if progress:
-                            bar.set_postfix(
-                                {k: 0 for k in prog_metric_names},
-                            )
+                            # bar.set_postfix(
+                            #     {k: 0 for k in prog_metric_names},
+                            # )
                             bar.update()
                         continue
                     co = self.criterion(logits, loss_targets, targets["subclass"])
@@ -471,15 +471,11 @@ class GEORGEClassification:
                     metrics[f"{key}_rob_auroc"] = rob_auroc
                 if not has_alt_subclass:
                     metrics[alt_subclass_rob_auroc] = auroc
-                PROGRESS_BAR_STR += (
-                    " | AUROC: {auroc:.4f} | R AUROC: {subclass_rob_auroc:.4f} | "
-                    "TR AUROC: {true_subclass_rob_auroc:.4f} | AR AUROC: {alt_subclass_rob_auroc:.4f}"
-                )
 
             if progress:
-                bar.set_postfix(
-                    {**metrics, **{k: v.avg for k, v in metric_meters.items()}}
-                )
+                # bar.set_postfix(
+                #     {**metrics, **{k: v.avg for k, v in metric_meters.items()}}
+                # )
                 bar.update()
         if progress:
             bar.close()

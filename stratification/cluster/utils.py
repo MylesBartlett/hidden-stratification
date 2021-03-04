@@ -1,5 +1,7 @@
 from collections import Counter
+
 import numpy as np
+
 from stratification.cluster.fast_sil import silhouette_samples
 
 

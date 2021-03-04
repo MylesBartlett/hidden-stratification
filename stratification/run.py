@@ -1,9 +1,12 @@
 import os
+from pathlib import Path
+
 import torch
 
 from stratification.harness import GEORGEHarness
-from stratification.utils.utils import set_seed, init_cuda
 from stratification.utils.parse_args import get_config
+from stratification.utils.utils import init_cuda, set_seed
+import wandb
 
 
 def main():
@@ -12,6 +15,19 @@ def main():
     set_seed(config['seed'], use_cuda)  # set seeds for reproducibility
     init_cuda(config['deterministic'], config['allow_multigpu'])
 
+
+    # Initialize wandb with online-logging as the default
+    local_dir = Path(".", "local_logging")
+    local_dir.mkdir(exist_ok=True)
+    if config.get("log_offline", False):
+        os.environ['WANDB_MODE'] = 'dryrun'
+    wandb.init(
+        entity="predictive-analytics-lab",
+        project="hidden-stratification",
+        dir=str(local_dir),
+        config=config,
+        reinit=True,
+    )
     torch.multiprocessing.set_sharing_strategy('file_system')
     harness = GEORGEHarness(config, use_cuda=use_cuda)
     harness.save_full_config(config)
@@ -74,14 +90,15 @@ def main():
             cluster_dir = harness.cluster(config['cluster_config'], cluster_model,
                                           inputs_path=os.path.join(reduction_dir, 'outputs.pt'))
 
-        set_seed(config['seed'], use_cuda)  # reset random state
-        dataloaders = harness.get_dataloaders(
-            config, mode='george', subclass_labels=os.path.join(cluster_dir, 'clusters.pt'))
-        model = harness.get_nn_model(config, num_classes=num_classes, mode='george')
+        # clusters = torch.load(os.join(cluster_dir, "clusters.pt"))
+        # set_seed(config['seed'], use_cuda)  # reset random state
+        # dataloaders = harness.get_dataloaders(
+        #     config, mode='george', subclass_labels=os.path.join(cluster_dir, 'clusters.pt'))
+        # model = harness.get_nn_model(config, num_classes=num_classes, mode='george')
 
-        # Train the final (GEORGE) model
-        george_dir = harness.classify(config['classification_config'], model, dataloaders,
-                                      mode='george')
+        # # Train the final (GEORGE) model
+        # george_dir = harness.classify(config['classification_config'], model, dataloaders,
+                                      # mode='george')
 
 
 if __name__ == '__main__':

@@ -1,11 +1,13 @@
 try:
     from libKMCUDA import kmeans_cuda
+
     _LIBKMCUDA_FOUND = True
 except ModuleNotFoundError:
     _LIBKMCUDA_FOUND = False
 
-from functools import partial
 import logging
+
+from gudhi.clustering.tomato import Tomato as _Tomato
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
@@ -13,15 +15,23 @@ from sklearn.mixture import GaussianMixture
 from stratification.cluster.utils import silhouette_samples
 
 __all__ = [
-    'KMeans', 'GaussianMixture', 'FastKMeans', 'AutoKMixtureModel', 'OverclusterModel',
-    'DummyClusterer'
+    "KMeans",
+    "GaussianMixture",
+    "FastKMeans",
+    "AutoKMixtureModel",
+    "OverclusterModel",
+    "DummyClusterer",
+    "Tomato"
 ]
 
 
 def get_cluster_sils(data, pred_labels, compute_sil=True, cuda=False):
     unique_preds = sorted(np.unique(pred_labels))
-    SIL_samples = silhouette_samples(data, pred_labels, cuda=cuda) if compute_sil else np.zeros(
-        len(data))
+    SIL_samples = (
+        silhouette_samples(data, pred_labels, cuda=cuda)
+        if compute_sil
+        else np.zeros(len(data))
+    )
     SILs_by_cluster = {
         int(label): float(np.mean(SIL_samples[pred_labels == label]))
         for label in unique_preds
@@ -45,22 +55,30 @@ class DummyClusterer:
     def predict(self, X):
         return np.zeros(len(X), dtype=np.int32)
 
+class Tomato(_Tomato):
+
+    def predict(self, x):
+        self.labels_
 
 class FastKMeans:
-    def __init__(self, n_clusters, random_state=0, init='k-means++', n_init=10, verbose=False):
+    def __init__(
+        self, n_clusters, random_state=0, init="k-means++", n_init=10, verbose=False
+    ):
         self.k = n_clusters
         self.init = init
-        if n_init > 1: logging.warning('n_init unsupported for GPU K-Means')
+        if n_init > 1:
+            logging.warning("n_init unsupported for GPU K-Means")
         self.seed = random_state
         self.verbose = verbose
         self.kmeans_obj = KMeans(n_clusters=n_clusters)
 
     def fit(self, X):
-        logging.info('Using GPU-accelerated K-Means...')
-        self.cluster_centers_ = kmeans_cuda(X.astype(np.float32), clusters=self.k, seed=self.seed,
-                                            init=self.init)[0].astype(np.float32)
+        logging.info("Using GPU-accelerated K-Means...")
+        self.cluster_centers_ = kmeans_cuda(
+            X.astype(np.float32), clusters=self.k, seed=self.seed, init=self.init
+        )[0].astype(np.float32)
         self.kmeans_obj.cluster_centers_ = self.cluster_centers_
-        if hasattr(self.kmeans_obj, '_check_params'):
+        if hasattr(self.kmeans_obj, "_check_params"):
             self.kmeans_obj._check_params(np.zeros_like(X))  # properly initialize
         return self.kmeans_obj
 
@@ -76,18 +94,31 @@ class FastKMeans:
 
 
 class AutoKMixtureModel:
-    def __init__(self, cluster_method, max_k, n_init=3, seed=None, sil_cuda=False, verbose=0,
-                 search=True):
-        if cluster_method == 'kmeans':
+    def __init__(
+        self,
+        cluster_method,
+        max_k,
+        n_init=3,
+        seed=None,
+        sil_cuda=False,
+        verbose=0,
+        search=True,
+        **method_kwargs
+    ):
+        if cluster_method == "kmeans":
             cluster_cls = FastKMeans if (sil_cuda and _LIBKMCUDA_FOUND) else KMeans
-            k_name = 'n_clusters'
-        elif cluster_method == 'gmm':
+            k_name = "n_clusters"
+        elif cluster_method == "gmm":
             cluster_cls = GaussianMixture
-            k_name = 'n_components'
+            k_name = "n_components"
+        elif cluster_method == "tomato":
+            cluster_cls = Tomato
+            k_name = "n_clusters"
         else:
-            raise ValueError('Unsupported clustering method')
+            raise ValueError("Unsupported clustering method")
 
         self.cluster_cls = cluster_cls
+        self.method_kwargs = method_kwargs
         self.k_name = k_name
         self.search = search
         self.max_k = max_k
@@ -98,27 +129,34 @@ class AutoKMixtureModel:
 
     def gen_inner_cluster_obj(self, k):
         # Return a clustering object according to the specified parameters
-        return self.cluster_cls(**{self.k_name: k}, n_init=self.n_init, random_state=self.seed,
-                                verbose=self.verbose)
+        return self.cluster_cls(
+            **{self.k_name: k},
+            n_init=self.n_init,
+            random_state=self.seed,
+            verbose=self.verbose,
+            **self.method_kwargs
+        )
 
     def fit(self, activ):
-        logger = logging.getLogger('harness.cluster')
+        logger = logging.getLogger("harness.cluster")
         best_score = -2
         k_min = 2 if self.search else self.max_k
         search = self.search and k_min != self.max_k
         for k in range(k_min, self.max_k + 1):
-            logger.info(f'Clustering into {k} groups...')
+            logger.info(f"Clustering into {k} groups...")
             cluster_obj = self.gen_inner_cluster_obj(k)
             pred_labels = cluster_obj.fit_predict(activ)
-            logger.info('Clustering done, computing score...')
-            cluster_sizes = compute_group_sizes(pred_labels)
+            logger.info("Clustering done, computing score...")
             if search:
-                local_sils, global_sil = get_cluster_sils(activ, pred_labels, compute_sil=True,
-                                                          cuda=self.sil_cuda)
+                local_sils, _ = get_cluster_sils(
+                    activ, pred_labels, compute_sil=True, cuda=self.sil_cuda
+                )
                 clustering_score = np.mean(list(local_sils.values()))
-                logger.info(f'k = {k} score: {clustering_score}')
+                logger.info(f"k = {k} score: {clustering_score}")
                 if clustering_score >= best_score:
-                    logger.info(f'Best model found at k = {k} with score {clustering_score:.3f}')
+                    logger.info(
+                        f"Best model found at k = {k} with score {clustering_score:.3f}"
+                    )
                     best_score = clustering_score
                     best_model = cluster_obj
                     best_k = k
@@ -138,18 +176,31 @@ class AutoKMixtureModel:
         self.fit(activ)
         return self.predict(activ)
 
-    def predict_proba(self, X):
+    def predict_proba(self, activ):
         return self.cluster_obj.predict_proba(activ)
 
-    def score(self, X):
+    def score(self, activ):
         return self.cluster_obj.score(activ)
 
 
 class OverclusterModel:
-    def __init__(self, cluster_method, max_k, oc_fac, n_init=3, search=True, sil_threshold=0.,
-                 seed=None, sil_cuda=False, verbose=0, sz_threshold_pct=0.005, sz_threshold_abs=25):
-        self.base_model = AutoKMixtureModel(cluster_method, max_k, n_init, seed, sil_cuda, verbose,
-                                            search)
+    def __init__(
+        self,
+        cluster_method,
+        max_k,
+        oc_fac,
+        n_init=3,
+        search=True,
+        sil_threshold=0.0,
+        seed=None,
+        sil_cuda=False,
+        verbose=0,
+        sz_threshold_pct=0.005,
+        sz_threshold_abs=25,
+    ):
+        self.base_model = AutoKMixtureModel(
+            cluster_method, max_k, n_init, seed, sil_cuda, verbose, search
+        )
         self.oc_fac = oc_fac
         self.sil_threshold = sil_threshold
         self.sz_threshold_pct = sz_threshold_pct
@@ -166,7 +217,9 @@ class OverclusterModel:
 
         for i in self.pred_vals:
             sub_activ = activ[orig_preds == i]
-            cluster_obj = self.base_model.gen_inner_cluster_obj(self.oc_fac).fit(sub_activ)
+            cluster_obj = self.base_model.gen_inner_cluster_obj(self.oc_fac).fit(
+                sub_activ
+            )
             self.cluster_objs.append(cluster_obj)
             sub_preds = cluster_obj.predict(sub_activ) + self.oc_fac * i
             oc_preds[orig_preds == i] = sub_preds
@@ -204,9 +257,12 @@ class OverclusterModel:
         # Decide which overclusters to keep
         oc_to_keep = []
         for i in range(num_oc):
-            if oc_new_sils[i] > max(oc_orig_sils[i], self.sil_threshold) and \
-              new_losses[i] >= orig_losses[i // self.oc_fac] and \
-              oc_counts[i] >= tr_sz_threshold and val_oc_counts[i] >= val_sz_threshold:
+            if (
+                oc_new_sils[i] > max(oc_orig_sils[i], self.sil_threshold)
+                and new_losses[i] >= orig_losses[i // self.oc_fac]
+                and oc_counts[i] >= tr_sz_threshold
+                and val_oc_counts[i] >= val_sz_threshold
+            ):
                 oc_to_keep.append(i)
 
         return oc_to_keep
@@ -221,7 +277,9 @@ class OverclusterModel:
             # For each original cluster, if there were no
             # overclusters kept within it, keep the original cluster as-is.
             # Otherwise, it needs to be split.
-            keep_all = True  # If we keep all overclusters, we can discard the original cluster
+            keep_all = (
+                True  # If we keep all overclusters, we can discard the original cluster
+            )
             for j in range(self.oc_fac):
                 index = i * self.oc_fac + j
                 if index not in oc_to_keep:
@@ -239,16 +297,16 @@ class OverclusterModel:
                     cur_cluster_ind += 1
                     oc_index = cur_cluster_ind
                 else:
-                    assert (not keep_all)
+                    assert not keep_all
                     oc_index = base_index
                 label_map[index] = oc_index
         return label_map
 
     def fit(self, activ, val_activ=None, losses=None):
         if val_activ is None or losses is None:
-            raise ValueError('Must provide losses and val set activations')
-        logger = logging.getLogger('harness.cluster')
-        logger.info('Fitting base model...')
+            raise ValueError("Must provide losses and val set activations")
+        logger = logging.getLogger("harness.cluster")
+        logger.info("Fitting base model...")
         orig_preds = self.base_model.fit_predict(activ)
         self.pred_vals = sorted(np.unique(orig_preds))
         num_orig_preds = len(self.pred_vals)
@@ -257,18 +315,23 @@ class OverclusterModel:
         num_oc = num_orig_preds * oc_fac
         val_orig_preds = self.base_model.predict(val_activ)
 
-        logger.info('Fitting overclustering model...')
-        oc_preds, val_oc_preds = self.get_oc_predictions(activ, val_activ, orig_preds,
-                                                         val_orig_preds)
-        oc_to_keep = self.filter_overclusters(activ, losses, orig_preds, oc_preds, val_oc_preds)
+        logger.info("Fitting overclustering model...")
+        oc_preds, val_oc_preds = self.get_oc_predictions(
+            activ, val_activ, orig_preds, val_orig_preds
+        )
+        oc_to_keep = self.filter_overclusters(
+            activ, losses, orig_preds, oc_preds, val_oc_preds
+        )
         self.label_map = self.create_label_map(num_orig_preds, oc_to_keep, oc_preds)
 
         new_preds = np.zeros(len(activ), dtype=np.int)
         for i in range(num_oc):
             new_preds[oc_preds == i] = self.label_map[i]
 
-        self.n_clusters = max(self.label_map.values()) + 1  # Final number of output predictions
-        logger.info(f'Final number of clusters: {self.n_clusters}')
+        self.n_clusters = (
+            max(self.label_map.values()) + 1
+        )  # Final number of output predictions
+        logger.info(f"Final number of clusters: {self.n_clusters}")
         return self
 
     def predict(self, activ):

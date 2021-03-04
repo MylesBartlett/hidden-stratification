@@ -20,7 +20,7 @@
             "loss",
             "acc"
         ],
-        "num_epochs": 100,
+        "num_epochs": 1,
         "batch_size": 128,
         "scheduler_config": {
             "class_args": {
@@ -50,6 +50,10 @@
             "composition"
         ],
         "search_k": true,
-        "overcluster": true
+        "overcluster": true,
+        "method_kwargs": {
+            "graph_type": "knn",
+            "density_type": "logDTM"
+        }
     }
 }

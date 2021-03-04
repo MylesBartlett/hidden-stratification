@@ -1,15 +1,17 @@
-import os
-import random
 from collections import defaultdict
 import json
+import os
+import pickle
+import random
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import sklearn.metrics as skl
-import pickle
 import torch
+
+import wandb
 
 
 def visualize_clusters_by_group(activations, cluster_assignments, group_assignments,
@@ -43,9 +45,11 @@ def visualize_clusters_by_group(activations, cluster_assignments, group_assignme
                                 hue_order=cluster_types,
                                 palette=sns.color_palette('hls', n_colors=n_colors), alpha=.5)
             plot_title = 'Clusters' if plot_type == 'cluster' else 'True subclasses'
-            plt.title(f'Superclass {group}: {plot_title}')
+            plot_title_full = f'Superclass {group}: {plot_title}'
+            plt.title(plot_title_full)
             plt.xlabel('')
             plt.ylabel('')
             g.get_figure().savefig(os.path.join(save_dir, f'group_{group}_{plot_type}_viz.png'),
                                    dpi=300)
             g.get_figure().clf()
+            wandb.log({plot_title_full: wandb.Image(g.get_figure())})

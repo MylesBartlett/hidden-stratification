@@ -20,7 +20,7 @@
             "loss",
             "acc"
         ],
-        "num_epochs": 1,
+        "num_epochs": 100,
         "batch_size": 128,
         "scheduler_config": {
             "class_args": {

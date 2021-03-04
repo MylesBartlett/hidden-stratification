@@ -372,7 +372,7 @@ class GEORGEClassification:
 
         progress = self.config["show_progress"]
         if progress:
-            bar = tqdm(desc=progress_prefix, total=len(dataloader))
+            bar = tqdm(desc=progress_prefix, total=len(dataloader), leave=True, position=0)
 
         for _, (inputs, targets) in enumerate(dataloader):
             batch_size = len(inputs)
@@ -477,8 +477,10 @@ class GEORGEClassification:
                 )
 
             if progress:
-                bar.set_postfix({**metrics, **{k: v.avg for k, v in metric_meters.items()}})
-                bar,update()
+                bar.set_postfix(
+                    {**metrics, **{k: v.avg for k, v in metric_meters.items()}}
+                )
+                bar, update()
         if progress:
             bar.close()
         if activations_handle:

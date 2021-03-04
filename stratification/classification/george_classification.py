@@ -23,13 +23,6 @@ from stratification.utils.utils import (
     move_to_device,
 )
 
-
-PROGRESS_BAR_SUFFIX = (
-    "({batch}/{size}) Time {total:} | ETA {eta:} | "
-    "Loss: {loss:.3f} | R Loss: {subclass_rob_loss:.3f} | "
-    "Acc: {acc:.3f} | RW acc: {acc_rw:.3f} | R acc: {subclass_rob_acc:.3f} | "
-    "RW R acc: {subclass_rob_acc_rw:.3f} | TR acc: {true_subclass_rob_acc:.3f}"
-)
 prog_metric_names = [
     "loss",
     "subclass_rob_loss",
@@ -443,8 +436,6 @@ class GEORGEClassification:
                 metric_meters, acc, loss, losses, corrects, batch_size, reweight_vec
             )
 
-            PROGRESS_BAR_STR = PROGRESS_BAR_SUFFIX
-
             if self.compute_auroc:
                 sub_map = dataloader.dataset.get_class_map("subclass")
                 assert set(sub_map.keys()) == {0, 1}  # must be a binary problem
@@ -487,9 +478,8 @@ class GEORGEClassification:
 
             if progress:
                 bar.set_postfix({**metrics, **{k: v.avg for k, v in metric_meters.items()}})
-                bar.update()
+                bar,update()
         if progress:
-            # bar.finish()
             bar.close()
         if activations_handle:
             activations_handle.remove()

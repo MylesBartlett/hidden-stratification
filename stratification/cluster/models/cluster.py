@@ -12,6 +12,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 
+from stratification.cluster.models.topograd import TopoGradCluster
 from stratification.cluster.utils import silhouette_samples
 
 __all__ = [
@@ -21,20 +22,17 @@ __all__ = [
     "AutoKMixtureModel",
     "OverclusterModel",
     "DummyClusterer",
-    "Tomato"
+    "Tomato",
 ]
 
 
 def get_cluster_sils(data, pred_labels, compute_sil=True, cuda=False):
     unique_preds = sorted(np.unique(pred_labels))
     SIL_samples = (
-        silhouette_samples(data, pred_labels, cuda=cuda)
-        if compute_sil
-        else np.zeros(len(data))
+        silhouette_samples(data, pred_labels, cuda=cuda) if compute_sil else np.zeros(len(data))
     )
     SILs_by_cluster = {
-        int(label): float(np.mean(SIL_samples[pred_labels == label]))
-        for label in unique_preds
+        int(label): float(np.mean(SIL_samples[pred_labels == label])) for label in unique_preds
     }
     SIL_global = float(np.mean(SIL_samples))
     return SILs_by_cluster, SIL_global
@@ -55,15 +53,18 @@ class DummyClusterer:
     def predict(self, X):
         return np.zeros(len(X), dtype=np.int32)
 
-class Tomato(_Tomato):
 
+class Tomato(_Tomato):
     def predict(self, x):
-        self.labels_
+        return self.labels_
+
+
+class Topograd:
+    ...
+
 
 class FastKMeans:
-    def __init__(
-        self, n_clusters, random_state=0, init="k-means++", n_init=10, verbose=False
-    ):
+    def __init__(self, n_clusters, random_state=0, init="k-means++", n_init=10, verbose=False):
         self.k = n_clusters
         self.init = init
         if n_init > 1:
@@ -98,22 +99,27 @@ class AutoKMixtureModel:
         self,
         cluster_method,
         max_k,
-        n_init=3,
-        seed=None,
         sil_cuda=False,
         verbose=0,
         search=True,
-        **method_kwargs
+        **method_kwargs,
     ):
         if cluster_method == "kmeans":
             cluster_cls = FastKMeans if (sil_cuda and _LIBKMCUDA_FOUND) else KMeans
             k_name = "n_clusters"
+            self.method_kwargs.setdefault("n_init", 3)
+            self.method_kwargs.setdefault("verbose", True)
         elif cluster_method == "gmm":
             cluster_cls = GaussianMixture
             k_name = "n_components"
+            self.method_kwargs.setdefault("n_init", 3)
+            self.method_kwargs.setdefault("verbose", True)
         elif cluster_method == "tomato":
             cluster_cls = Tomato
             k_name = "n_clusters"
+        elif cluster_method == "topograd":
+            cluster_cls = TopoGradCluster
+            k_name = "destnum"
         else:
             raise ValueError("Unsupported clustering method")
 
@@ -122,8 +128,6 @@ class AutoKMixtureModel:
         self.k_name = k_name
         self.search = search
         self.max_k = max_k
-        self.n_init = n_init
-        self.seed = seed
         self.sil_cuda = sil_cuda
         self.verbose = verbose
 
@@ -131,10 +135,7 @@ class AutoKMixtureModel:
         # Return a clustering object according to the specified parameters
         return self.cluster_cls(
             **{self.k_name: k},
-            n_init=self.n_init,
-            random_state=self.seed,
-            verbose=self.verbose,
-            **self.method_kwargs
+            **self.method_kwargs,
         )
 
     def fit(self, activ):
@@ -154,9 +155,7 @@ class AutoKMixtureModel:
                 clustering_score = np.mean(list(local_sils.values()))
                 logger.info(f"k = {k} score: {clustering_score}")
                 if clustering_score >= best_score:
-                    logger.info(
-                        f"Best model found at k = {k} with score {clustering_score:.3f}"
-                    )
+                    logger.info(f"Best model found at k = {k} with score {clustering_score:.3f}")
                     best_score = clustering_score
                     best_model = cluster_obj
                     best_k = k
@@ -189,17 +188,15 @@ class OverclusterModel:
         cluster_method,
         max_k,
         oc_fac,
-        n_init=3,
         search=True,
         sil_threshold=0.0,
-        seed=None,
         sil_cuda=False,
-        verbose=0,
         sz_threshold_pct=0.005,
         sz_threshold_abs=25,
+        **method_kwargs,
     ):
         self.base_model = AutoKMixtureModel(
-            cluster_method, max_k, n_init, seed, sil_cuda, verbose, search
+            cluster_method, max_k, sil_cuda, search, **method_kwargs
         )
         self.oc_fac = oc_fac
         self.sil_threshold = sil_threshold
@@ -217,9 +214,7 @@ class OverclusterModel:
 
         for i in self.pred_vals:
             sub_activ = activ[orig_preds == i]
-            cluster_obj = self.base_model.gen_inner_cluster_obj(self.oc_fac).fit(
-                sub_activ
-            )
+            cluster_obj = self.base_model.gen_inner_cluster_obj(self.oc_fac).fit(sub_activ)
             self.cluster_objs.append(cluster_obj)
             sub_preds = cluster_obj.predict(sub_activ) + self.oc_fac * i
             oc_preds[orig_preds == i] = sub_preds
@@ -277,9 +272,7 @@ class OverclusterModel:
             # For each original cluster, if there were no
             # overclusters kept within it, keep the original cluster as-is.
             # Otherwise, it needs to be split.
-            keep_all = (
-                True  # If we keep all overclusters, we can discard the original cluster
-            )
+            keep_all = True  # If we keep all overclusters, we can discard the original cluster
             for j in range(self.oc_fac):
                 index = i * self.oc_fac + j
                 if index not in oc_to_keep:
@@ -319,18 +312,14 @@ class OverclusterModel:
         oc_preds, val_oc_preds = self.get_oc_predictions(
             activ, val_activ, orig_preds, val_orig_preds
         )
-        oc_to_keep = self.filter_overclusters(
-            activ, losses, orig_preds, oc_preds, val_oc_preds
-        )
+        oc_to_keep = self.filter_overclusters(activ, losses, orig_preds, oc_preds, val_oc_preds)
         self.label_map = self.create_label_map(num_orig_preds, oc_to_keep, oc_preds)
 
         new_preds = np.zeros(len(activ), dtype=np.int)
         for i in range(num_oc):
             new_preds[oc_preds == i] = self.label_map[i]
 
-        self.n_clusters = (
-            max(self.label_map.values()) + 1
-        )  # Final number of output predictions
+        self.n_clusters = max(self.label_map.values()) + 1  # Final number of output predictions
         logger.info(f"Final number of clusters: {self.n_clusters}")
         return self
 

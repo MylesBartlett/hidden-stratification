@@ -3,6 +3,7 @@
     "dataset": "mnist",
     "mode": "george",
     "seed": 0,
+    "log_offline": false,
     "classification_config": {
         "model": "lenet4",
         "checkpoint_metric": "val_acc_rw",
@@ -11,7 +12,7 @@
                 "lr": 0.002,
                 "weight_decay": 1e-5
             },
-            "class_name": "Adam"
+            "class_name": "AdamW"
         },
         "criterion_config": {},
         "workers": 8,
@@ -46,18 +47,16 @@
     "cluster_config": {
         "model": "gmm",
         "metric_types": [
-            "mean_loss",
-            "composition",
             "ari",
             "nmi"
         ],
+        "k": 5,
         "search_k": true,
         "overcluster": true,
         "method_kwargs": {
-            "graph_type": "knn",
-            "k": 30,
-            "density_type": "logDTM",
-            "k_DIM": 100
+            "iters": 1,
+            "k_rips": 30,
+            "k_kde_": 100
         }
     }
 }

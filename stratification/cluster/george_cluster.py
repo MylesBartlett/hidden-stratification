@@ -55,7 +55,6 @@ class GEORGECluster:
                     labels_true=inputs["true_subclass"], labels_pred=assignments  # type: ignore
                 )
             elif metric_type == "ari":
-                breakpoint()
                 metric = adjusted_rand_score(
                     labels_true=inputs["true_subclass"], labels_pred=assignments
                 )

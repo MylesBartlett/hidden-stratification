@@ -107,13 +107,13 @@ class AutoKMixtureModel:
         if cluster_method == "kmeans":
             cluster_cls = FastKMeans if (sil_cuda and _LIBKMCUDA_FOUND) else KMeans
             k_name = "n_clusters"
-            self.method_kwargs.setdefault("n_init", 3)
-            self.method_kwargs.setdefault("verbose", True)
+            method_kwargs.setdefault("n_init", 3)
+            method_kwargs.setdefault("verbose", True)
         elif cluster_method == "gmm":
             cluster_cls = GaussianMixture
             k_name = "n_components"
-            self.method_kwargs.setdefault("n_init", 3)
-            self.method_kwargs.setdefault("verbose", True)
+            method_kwargs.setdefault("n_init", 3)
+            method_kwargs.setdefault("verbose", True)
         elif cluster_method == "topograd":
             cluster_cls = Tomato
             k_name = "n_clusters"

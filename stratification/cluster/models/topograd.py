@@ -269,7 +269,8 @@ class TopoGradLoss(nn.Module):
 
 
 class TopoGradCluster:
-    labels_: np.ndarray
+    labels: np.ndarray
+    pers_pairs: np.ndarray
 
     def __init__(
         self,
@@ -311,17 +312,23 @@ class TopoGradCluster:
                 pbar.set_postfix(loss=loss.item())
                 pbar.update()
 
-        self.labels_ = tomato(
+        clusters, pers_pairs = tomato(
             x.detach().numpy(),
             k_kde=self.k_kde,
             k_rips=self.k_rips,
             scale=self.scale,
             threshold=self.merge_threshold,
         )
+        cluster_labels = np.empty(x.shape[0])
+        for k, v in enumerate(clusters.values()):
+            cluster_labels[v] = k
+        self.labels = cluster_labels
+        self.pers_pairs = pers_pairs
+
         return self
 
     def fit_predict(self, x: Tensor | np.ndarray) -> np.ndarray:
-        return self.fit(x).labels_
+        return self.fit(x).labels
 
     def predict(self, x: Tensor | np.ndarray) -> np.ndarray:
-        return self.labels_
+        return self.labels

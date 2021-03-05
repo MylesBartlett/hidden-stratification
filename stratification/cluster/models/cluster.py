@@ -114,7 +114,7 @@ class AutoKMixtureModel:
             k_name = "n_components"
             self.method_kwargs.setdefault("n_init", 3)
             self.method_kwargs.setdefault("verbose", True)
-        elif cluster_method == "tomato":
+        elif cluster_method == "topograd":
             cluster_cls = Tomato
             k_name = "n_clusters"
         elif cluster_method == "topograd":

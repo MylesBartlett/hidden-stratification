@@ -468,6 +468,7 @@ class GEORGEHarness:
             "sil_cuda": cluster_config["sil_cuda"],
             "search": cluster_config["search_k"],
         }
+        kwargs.update(cluster_config["method_kwargs"])
         if cluster_config["overcluster"]:
             cluster_model = OverclusterModel(**kwargs, oc_fac=cluster_config["overcluster_factor"])
         else:

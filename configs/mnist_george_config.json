@@ -50,7 +50,7 @@
             "ari",
             "nmi"
         ],
-        "k": 5,
+        "k": 4,
         "search_k": true,
         "overcluster": true,
         "method_kwargs": {

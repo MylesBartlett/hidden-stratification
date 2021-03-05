@@ -464,7 +464,6 @@ class GEORGEHarness:
         kwargs = {
             "cluster_method": cluster_config["model"],
             "max_k": cluster_config["k"],
-            "seed": config["seed"],
             "sil_cuda": cluster_config["sil_cuda"],
             "search": cluster_config["search_k"],
         }

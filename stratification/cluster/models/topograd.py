@@ -302,11 +302,14 @@ class TopoGradCluster:
         else:
             x = x.cpu().detach().clone().requires_grad_(True)
         optimizer = self.optimizer_cls((x,), lr=self.lr)
-        for _ in tqdm(range(self.iters), desc="topograd"):
-            loss = self._loss_fn(x)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        with tqdm(desc="topograd", total=self.iters) as pbar:
+            for _ in range(self.iters):
+                loss = self._loss_fn(x)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                pbar.set_postfix(loss=loss.item())
+                pbar.update()
 
         self.labels_ = tomato(
             x.detach().numpy(),

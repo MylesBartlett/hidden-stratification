@@ -55,7 +55,9 @@
         "overcluster": true,
         "method_kwargs": {
             "graph_type": "knn",
-            "density_type": "logDTM"
+            "k": 30,
+            "density_type": "logDTM",
+            "k_DIM": 100
         }
     }
 }

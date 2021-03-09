@@ -122,11 +122,13 @@ class GEORGECluster:
             # cluster
             self.logger.basic_info(f"Clustering superclass {group}...")
             cluster_model = cluster_model.fit(activations, **kwargs)
+            clusters = cluster_model.predict(activations)
+            assert clusters.shape[0] == activations.shape[0]
             group_to_models.append(cluster_model)
 
         return group_to_models
 
-    def evaluate(self, group_to_models, split_inputs):
+    def evaluate(self, group_to_models, inputs, split):
         """Returns cluster assignments for each of the inputs.
 
         Args:
@@ -142,7 +144,7 @@ class GEORGECluster:
                 the outputs consists of both the reduced activations and the cluster
                 assignments (`activations` and `assignments` keys, respectively).
         """
-        group_to_data, group_assignments = split_inputs
+        group_to_data, group_assignments = inputs[split]
         group_to_metrics = {}
         group_to_outputs = {}
         cluster_floor = 0
@@ -151,8 +153,10 @@ class GEORGECluster:
 
             group_outputs = group_data.copy()
             cluster_model = group_to_models[group]
-            assignments = np.array(cluster_model.predict(group_data["activations"]))
-            breakpoint()
+            activations = group_data["activations"]
+            assignments = np.array(cluster_model.predict(activations))
+
+            assert assignments.shape[0] == group_data["activations"].shape[0]
             group_outputs["assignments"] = cluster_floor + assignments
 
             group_to_outputs[int(group)] = group_outputs

@@ -7,6 +7,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import WeightedRandomSampler
+import wandb
 
 from stratification.classification import datasets
 from stratification.classification.george_classification import GEORGEClassification
@@ -24,7 +25,6 @@ from stratification.utils.utils import (
     merge_dicts,
 )
 from stratification.utils.visualization import visualize_clusters_by_group
-import wandb
 
 
 class GEORGEHarness:
@@ -280,7 +280,7 @@ class GEORGEHarness:
             len(set(inputs.keys()) & {"train", "val", "test"}) == 3
         ), 'Must have ["train", "val", "test"] splits.'
         for split, split_inputs in inputs.items():
-            for group, group_data in split_inputs[0].items():
+            for _, group_data in split_inputs[0].items():
                 assert len(set(group_data.keys()) & {"activations", "losses"}) == 2, (
                     f'{split} split of loaded inputs must have ["activations", "losses"] keys'
                     " for each superclass"
@@ -297,6 +297,11 @@ class GEORGEHarness:
             metrics, outputs = c_trainer.evaluate(group_to_models, inputs[split])
             split_to_metrics[split] = metrics
             split_to_outputs[split] = outputs
+
+        if cluster_config["model"] in ("tomato", "topograd"):
+            metrics, outputs = c_trainer.evaluate(group_to_models, inputs["train"])
+            split_to_metrics["train"] = metrics
+            split_to_outputs["train"] = outputs
 
         # (3) save everything
         wandb.log(split_to_metrics)

@@ -152,6 +152,7 @@ class GEORGECluster:
             group_outputs = group_data.copy()
             cluster_model = group_to_models[group]
             assignments = np.array(cluster_model.predict(group_data["activations"]))
+            breakpoint()
             group_outputs["assignments"] = cluster_floor + assignments
 
             group_to_outputs[int(group)] = group_outputs

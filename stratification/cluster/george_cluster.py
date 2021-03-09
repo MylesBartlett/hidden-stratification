@@ -120,7 +120,7 @@ class GEORGECluster:
                 activations = np.concatenate(
                     [activations, val_activations, test_activations], axis=0
                 )
-            if extra_info:
+            elif extra_info:
                 val_group_data = inputs_val[0][group]
                 losses = group_data["losses"]
                 val_activations = val_group_data["activations"]

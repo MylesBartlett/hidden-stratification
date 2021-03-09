@@ -54,9 +54,9 @@ class DummyClusterer:
         return np.zeros(len(X), dtype=np.int32)
 
 
-class Tomato(_Tomato):
-    def predict(self, x):
-        return self.labels_
+# class Tomato(_Tomato):
+#     def predict(self, x, split: str):
+#         return self.labels_
 
 
 class Topograd:

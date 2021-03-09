@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
 
 from stratification.cluster.models.cluster import DummyClusterer
+from stratification.cluster.models.topograd import TopoGradCluster
 from stratification.cluster.utils import (
     get_cluster_composition,
     get_cluster_mean_loss,
@@ -99,6 +100,7 @@ class GEORGECluster:
 
         inputs_tr = inputs["train"]
         inputs_val = inputs["val"]
+        inputs_test = inputs["test"]
 
         group_to_models = []
         for group, group_data in inputs_tr[0].items():
@@ -111,6 +113,13 @@ class GEORGECluster:
             cluster_model = deepcopy(orig_cluster_model)
             activations = group_data["activations"]
 
+            if isinstance(cluster_model, TopoGradCluster):
+                val_activations = inputs_val[0][group]["activations"]
+                kwargs = {"split_indices": (len(activations, len(val_activations)))}
+                test_activations = inputs_test[0][group]["activations"]
+                activations = np.concatenate(
+                    [activations, val_activations, test_activations], axis=0
+                )
             if extra_info:
                 val_group_data = inputs_val[0][group]
                 losses = group_data["losses"]
@@ -154,7 +163,10 @@ class GEORGECluster:
             group_outputs = group_data.copy()
             cluster_model = group_to_models[group]
             activations = group_data["activations"]
-            assignments = np.array(cluster_model.predict(activations))
+            kwargs = {}
+            if isinstance(cluster_model, TopoGradCluster):
+                kwargs["split"] = split
+            assignments = np.array(cluster_model.predict(activations, **kwargs))
 
             assert assignments.shape[0] == group_data["activations"].shape[0]
             group_outputs["assignments"] = cluster_floor + assignments

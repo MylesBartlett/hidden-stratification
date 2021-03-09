@@ -1,8 +1,9 @@
 from __future__ import annotations
 import logging
-from typing import Any, Optional, Tuple, cast
+from typing import Any, Literal, Optional, Tuple, cast
 import warnings
 
+from faiss import IndexFlatL2
 from numba import jit
 import numpy as np
 import torch
@@ -11,8 +12,6 @@ from torch.autograd import Function
 import torch.nn as nn
 import torch.optim
 from tqdm import tqdm
-
-from faiss import IndexFlatL2
 
 __all__ = [
     "rbf",
@@ -297,7 +296,7 @@ class TopoGradCluster:
         self._loss_fn = TopoGradLoss(k_kde=k_kde, k_rips=k_rips, scale=scale, destnum=destnum)
         self.logger = logging.getLogger(__name__)
 
-    def fit(self, x: Tensor | np.ndarray) -> TopoGradCluster:
+    def fit(self, x: Tensor | np.ndarray, split_indices: tuple[int, int, int]) -> TopoGradCluster:
         if isinstance(x, np.ndarray):
             x = torch.as_tensor(x).requires_grad_(True)
         else:
@@ -323,12 +322,19 @@ class TopoGradCluster:
         for k, v in enumerate(clusters.values()):
             cluster_labels[v] = k
         self.labels = cluster_labels
+        self.split_indices = split_indices
         self.pers_pairs = pers_pairs
 
         return self
 
-    def fit_predict(self, x: Tensor | np.ndarray) -> np.ndarray:
-        return self.fit(x).labels
+    def fit_predict(self, x: Tensor | np.ndarray, split_indices: tuple[int, int]) -> np.ndarray:
+        return self.fit(x, split_indices=split_indices).labels
 
-    def predict(self, x: Tensor | np.ndarray) -> np.ndarray:
-        return self.labels
+    def predict(self, x: Tensor | np.ndarray, split: Literal["train", "val", "test"]) -> np.ndarray:
+        labels = self.labels
+        if split == "train":
+            return labels[: self.split_indices[0]]
+        elif split == "val":
+            return labels[self.split_indices[0] : self.split_indices[1]]
+        else:  # split == test
+            return labels[-self.split_indices[1]]

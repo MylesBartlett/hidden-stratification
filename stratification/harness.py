@@ -15,7 +15,12 @@ from stratification.classification.models import *
 from stratification.cluster.george_cluster import GEORGECluster
 from stratification.cluster.george_reduce import GEORGEReducer
 from stratification.cluster.models import reduction
-from stratification.cluster.models.cluster import AutoKMixtureModel, OverclusterModel
+from stratification.cluster.models.cluster import (
+    AutoKMixtureModel,
+    OverclusterModel,
+    Tomato,
+)
+from stratification.cluster.models.topograd import TopoGradCluster
 from stratification.cluster.utils import get_k_from_model
 from stratification.utils.logger import init_logger
 from stratification.utils.utils import (
@@ -294,14 +299,9 @@ class GEORGEHarness:
         split_to_metrics = {}
         split_to_outputs = {}
         for split, split_inputs in inputs.items():
-            metrics, outputs = c_trainer.evaluate(group_to_models, inputs[split])
+            metrics, outputs = c_trainer.evaluate(group_to_models, inputs, split=split)
             split_to_metrics[split] = metrics
             split_to_outputs[split] = outputs
-
-        if cluster_config["model"] in ("tomato", "topograd"):
-            metrics, outputs = c_trainer.evaluate(group_to_models, inputs["train"])
-            split_to_metrics["train"] = metrics
-            split_to_outputs["train"] = outputs
 
         # (3) save everything
         wandb.log(split_to_metrics)
@@ -466,17 +466,22 @@ class GEORGEHarness:
     def get_cluster_model(self, config):
         cluster_config = config["cluster_config"]
 
-        kwargs = {
-            "cluster_method": cluster_config["model"],
-            "max_k": cluster_config["k"],
-            "sil_cuda": cluster_config["sil_cuda"],
-            "search": cluster_config["search_k"],
-        }
-        kwargs.update(cluster_config["method_kwargs"])
-        if cluster_config["overcluster"]:
-            cluster_model = OverclusterModel(**kwargs, oc_fac=cluster_config["overcluster_factor"])
+        if cluster_config["model"] == "topograd":
+            cluster_model = TopoGradCluster(**cluster_config["method_kwargs"])
         else:
-            cluster_model = AutoKMixtureModel(**kwargs)
+            kwargs = {
+                "cluster_method": cluster_config["model"],
+                "max_k": cluster_config["k"],
+                "sil_cuda": cluster_config["sil_cuda"],
+                "search": cluster_config["search_k"],
+            }
+            kwargs.update(cluster_config["method_kwargs"])
+            if cluster_config["overcluster"]:
+                cluster_model = OverclusterModel(
+                    **kwargs, oc_fac=cluster_config["overcluster_factor"]
+                )
+            else:
+                cluster_model = AutoKMixtureModel(**kwargs)
         return cluster_model
 
     def _save_cluster_visualizations(self, save_dir, inputs, group_to_k, split_to_outputs, trainer):

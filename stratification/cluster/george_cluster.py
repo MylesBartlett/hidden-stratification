@@ -115,7 +115,7 @@ class GEORGECluster:
 
             if isinstance(cluster_model, TopoGradCluster):
                 val_activations = inputs_val[0][group]["activations"]
-                kwargs = {"split_indices": (len(activations, len(val_activations)))}
+                kwargs = {"split_indices": (len(activations), len(val_activations))}
                 test_activations = inputs_test[0][group]["activations"]
                 activations = np.concatenate(
                     [activations, val_activations, test_activations], axis=0

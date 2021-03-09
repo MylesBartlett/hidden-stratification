@@ -131,8 +131,6 @@ class GEORGECluster:
             # cluster
             self.logger.basic_info(f"Clustering superclass {group}...")
             cluster_model = cluster_model.fit(activations, **kwargs)
-            clusters = cluster_model.predict(activations)
-            assert clusters.shape[0] == activations.shape[0]
             group_to_models.append(cluster_model)
 
         return group_to_models

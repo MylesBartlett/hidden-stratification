@@ -463,7 +463,9 @@ class GEORGEHarness:
         cluster_config = config["cluster_config"]
 
         if cluster_config["model"] == "topograd":
-            cluster_model = TopoGradCluster(**cluster_config["method_kwargs"])
+            cluster_model = TopoGradCluster(
+                destnum=cluster_config["k"], **cluster_config["method_kwargs"]
+            )
         else:
             kwargs = {
                 "cluster_method": cluster_config["model"],

@@ -15,11 +15,7 @@ from stratification.classification.models import *
 from stratification.cluster.george_cluster import GEORGECluster
 from stratification.cluster.george_reduce import GEORGEReducer
 from stratification.cluster.models import reduction
-from stratification.cluster.models.cluster import (
-    AutoKMixtureModel,
-    OverclusterModel,
-    Tomato,
-)
+from stratification.cluster.models.cluster import AutoKMixtureModel, OverclusterModel
 from stratification.cluster.models.topograd import TopoGradCluster
 from stratification.cluster.utils import get_k_from_model
 from stratification.utils.logger import init_logger

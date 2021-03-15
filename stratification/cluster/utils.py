@@ -1,13 +1,15 @@
 from __future__ import annotations
 from collections import Counter
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from stratification.cluster.models import (
-    AutoKMixtureModel,
-    OverclusterModel,
-    TopoGradCluster,
-)
+if TYPE_CHECKING:
+    from stratification.cluster.models import (
+        AutoKMixtureModel,
+        OverclusterModel,
+        TopoGradCluster,
+    )
 
 
 def get_k_from_model(model: AutoKMixtureModel | OverclusterModel | TopoGradCluster) -> int:

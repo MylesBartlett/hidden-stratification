@@ -4,6 +4,7 @@ import logging
 
 import numpy as np
 from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
+import wandb
 
 from stratification.cluster.models.cluster import DummyClusterer
 from stratification.cluster.models.topograd import TopoGradCluster
@@ -131,6 +132,10 @@ class GEORGECluster:
             # cluster
             self.logger.basic_info(f"Clustering superclass {group}...")
             cluster_model = cluster_model.fit(activations, **kwargs)
+            if isinstance(cluster_model, TopoGradCluster):
+                pd_plot = cluster_model.plot()
+                wandb.log({f"pd_plot_[superclass={group}]": wandb.Image(pd_plot)})
+
             group_to_models.append(cluster_model)
 
         return group_to_models

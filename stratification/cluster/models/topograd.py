@@ -4,6 +4,7 @@ from typing import Any, Literal, Optional, Tuple, cast
 import warnings
 
 from faiss import IndexFlatL2
+import matplotlib.pyplot as plt
 from numba import jit
 import numpy as np
 import torch
@@ -295,6 +296,16 @@ class TopoGradCluster:
         self.optimizer_kwargs = optimizer_kwargs
         self._loss_fn = TopoGradLoss(k_kde=k_kde, k_rips=k_rips, scale=scale, destnum=destnum)
         self.logger = logging.getLogger(__name__)
+
+    def plot(self) -> plt.Figure:
+        fig, ax = plt.subplots(dpi=100)
+        ax.scatter(self._pers_pairs[:, 0], self._pers_pairs[:, 1], s=15, c="orange")  # type: ignore[arg-type]
+        ax.plot(np.array([0, 1]), np.array([0, 1]), c="black", alpha=0.6)  # type: ignore[call-arg]
+        ax.set_xlabel("Death")
+        ax.set_ylabel("Birth")
+        ax.set_title("Persistence Diagram")
+
+        return fig
 
     def fit(self, x: Tensor | np.ndarray, split_indices: tuple[int, int, int]) -> TopoGradCluster:
         if isinstance(x, np.ndarray):

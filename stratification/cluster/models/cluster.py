@@ -7,7 +7,6 @@ except ModuleNotFoundError:
 
 import logging
 
-from gudhi.clustering.tomato import Tomato as _Tomato
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
@@ -22,7 +21,6 @@ __all__ = [
     "AutoKMixtureModel",
     "OverclusterModel",
     "DummyClusterer",
-    "Tomato",
 ]
 
 

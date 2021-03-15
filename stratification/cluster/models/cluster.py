@@ -12,8 +12,8 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 
+from stratification.cluster.fast_sil import silhouette_samples
 from stratification.cluster.models.topograd import TopoGradCluster
-from stratification.cluster.utils import silhouette_samples
 
 __all__ = [
     "KMeans",

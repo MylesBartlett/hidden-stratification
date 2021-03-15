@@ -271,6 +271,7 @@ class TopoGradLoss(nn.Module):
 class TopoGradCluster:
     labels: np.ndarray
     pers_pairs: np.ndarray
+    split_indces: np.ndarray
 
     def __init__(
         self,
@@ -307,7 +308,7 @@ class TopoGradCluster:
 
         return fig
 
-    def fit(self, x: Tensor | np.ndarray, split_indices: tuple[int, int, int]) -> TopoGradCluster:
+    def fit(self, x: Tensor | np.ndarray, split_sizes: tuple[int, int, int]) -> TopoGradCluster:
         if isinstance(x, np.ndarray):
             x = torch.as_tensor(x).requires_grad_(True)
         else:
@@ -333,13 +334,13 @@ class TopoGradCluster:
         for k, v in enumerate(clusters.values()):
             cluster_labels[v] = k
         self.labels = cluster_labels
-        self.split_indices = split_indices
+        self.split_indices = np.cumsum(split_sizes)
         self.pers_pairs = pers_pairs
 
         return self
 
     def fit_predict(self, x: Tensor | np.ndarray, split_indices: tuple[int, int]) -> np.ndarray:
-        return self.fit(x, split_indices=split_indices).labels
+        return self.fit(x, split_sizes=split_indices).labels
 
     def predict(self, x: Tensor | np.ndarray, split: Literal["train", "val", "test"]) -> np.ndarray:
         labels = self.labels

@@ -53,10 +53,6 @@
         "k": 4,
         "search_k": true,
         "overcluster": true,
-        "method_kwargs": {
-            "iters": 1,
-            "k_rips": 30,
-            "k_kde_": 100
-        }
+        "method_kwargs": {}
     }
 }

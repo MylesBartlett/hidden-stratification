@@ -1,4 +1,5 @@
 cmake
+faiss-cpu
 gdown
 gudhi
 ipykernel

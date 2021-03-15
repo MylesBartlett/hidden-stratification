@@ -54,6 +54,7 @@
         "search_k": false,
         "overcluster": false,
         "method_kwargs": {
+            "iters": 0,
             "k_rips": 30,
             "k_kde": 100
         }

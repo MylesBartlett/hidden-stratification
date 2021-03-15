@@ -54,15 +54,6 @@ class DummyClusterer:
         return np.zeros(len(X), dtype=np.int32)
 
 
-# class Tomato(_Tomato):
-#     def predict(self, x, split: str):
-#         return self.labels_
-
-
-class Topograd:
-    ...
-
-
 class FastKMeans:
     def __init__(self, n_clusters, random_state=0, init="k-means++", n_init=10, verbose=False):
         self.k = n_clusters

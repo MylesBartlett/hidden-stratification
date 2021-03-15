@@ -1,18 +1,27 @@
+from __future__ import annotations
 from collections import Counter
 
 import numpy as np
 
-from stratification.cluster.fast_sil import silhouette_samples
+from stratification.cluster.models import (
+    AutoKMixtureModel,
+    OverclusterModel,
+    TopoGradCluster,
+)
 
 
-def get_k_from_model(model):
-    if hasattr(model, 'n_clusters'):
+def get_k_from_model(model: AutoKMixtureModel | OverclusterModel | TopoGradCluster) -> int:
+    if hasattr(model, "n_clusters"):
         return model.n_clusters
-    elif hasattr(model, 'n_components'):
+    elif hasattr(model, "n_components"):
         return model.n_components
+    elif hasattr(model, "destnum"):
+        return model.destnum
     else:
-        raise NotImplementedError(f'model {type(model)} K not found.' +
-                                  f'model attributes:\n{list(model.__dict__.keys())}')
+        raise NotImplementedError(
+            f"model {type(model)} K not found."
+            + f"model attributes:\n{list(model.__dict__.keys())}"
+        )
 
 
 def get_cluster_mean_loss(sample_losses, assignments):

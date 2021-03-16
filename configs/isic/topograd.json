@@ -56,7 +56,7 @@
         ],
         "search_k": false,
         "overcluster": false,
-        "superclasses_to_ignore": [1]
+        "superclasses_to_ignore": [1],
         "method_kwargs": {
             "iters": 10,
             "k_rips": 30,

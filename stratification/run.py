@@ -20,6 +20,11 @@ def main():
     local_dir.mkdir(exist_ok=True)
     if config.get("log_offline", False):
         os.environ["WANDB_MODE"] = "dryrun"
+    cluster_model_name = config["cluster_config"]["model"]
+    if cluster_model_name == "topograd":
+        if config["cluster_config"]["method_kwargs"].get("iters", -1) == 0:
+            cluster_model_name = "tomato"
+
     wandb.init(
         entity="predictive-analytics-lab",
         project="hidden-stratification",

@@ -300,7 +300,7 @@ class TopoGradCluster:
 
     def plot(self) -> plt.Figure:
         fig, ax = plt.subplots(dpi=100)
-        ax.scatter(self.pers_pairs[:, 0], self.pers_pairs[:, 1], s=15, c="orange")  # type: ignore[arg-type]
+        ax.scatter(self.pers_pairs[:, 1], self.pers_pairs[:, 0], s=15, c="orange")  # type: ignore[arg-type]
         ax.plot(np.array([0, 1]), np.array([0, 1]), c="black", alpha=0.6)  # type: ignore[call-arg]
         ax.set_xlabel("Death")
         ax.set_ylabel("Birth")

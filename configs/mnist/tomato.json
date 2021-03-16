@@ -58,7 +58,7 @@
             "iters": 0,
             "k_rips": 30,
             "k_kde": 100,
-            "threshold": 0.5
+            "merge_threshold": 0.5
         }
     }
 }

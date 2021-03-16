@@ -349,4 +349,4 @@ class TopoGradCluster:
         elif split == "val":
             return labels[self.split_indices[0] : self.split_indices[1]]
         else:  # split == test
-            return labels[:self.split_indices[1]]
+            return labels[-self.split_indices[1] :]

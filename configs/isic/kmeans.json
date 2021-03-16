@@ -5,6 +5,7 @@
     "dataset": "isic",
     "mode": "george",
     "seed": 0,
+    "log_offline": false,
     "classification_config": {
         "model": "resnet50",
         "checkpoint_metric": "val_auroc",

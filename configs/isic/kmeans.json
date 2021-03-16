@@ -5,6 +5,7 @@
     "dataset": "isic",
     "mode": "george",
     "seed": 0,
+    "allow_multigpu": true,
     "log_offline": false,
     "classification_config": {
         "model": "resnet50",

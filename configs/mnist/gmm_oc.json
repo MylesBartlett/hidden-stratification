@@ -43,7 +43,8 @@
         "dataset_config": {}
     },
     "reduction_config": {
-        "model": "umap"
+        "model": "umap",
+        "n_components": 2
     },
     "cluster_config": {
         "model": "gmm",

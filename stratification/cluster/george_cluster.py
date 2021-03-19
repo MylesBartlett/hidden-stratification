@@ -9,6 +9,9 @@ import wandb
 from stratification.cluster.models.cluster import DummyClusterer
 from stratification.cluster.models.topograd import TopoGradCluster
 from stratification.cluster.utils import (
+    apply_encodiing_dict,
+    compute_optimal_assignments,
+    get_cluster_composition,
     get_cluster_composition,
     get_cluster_mean_loss,
     get_k_from_model,
@@ -49,20 +52,29 @@ class GEORGECluster:
         metrics = {}
         for metric_type in self.config["metric_types"]:
             if metric_type == "mean_loss":
-                metric = get_cluster_mean_loss(inputs["losses"], assignments)
+                metrics[metric_type] = get_cluster_mean_loss(inputs["losses"], assignments)
             elif metric_type == "composition":
-                metric = get_cluster_composition(inputs["true_subclass"], assignments)
+                metrics[metric_type] = get_cluster_composition(inputs["true_subclass"], assignments)
             elif metric_type == "nmi":
-                metric = normalized_mutual_info_score(
+                metrics[metric_type] = normalized_mutual_info_score(
                     labels_true=inputs["true_subclass"], labels_pred=assignments  # type: ignore
                 )
             elif metric_type == "ari":
-                metric = adjusted_rand_score(
+                metrics[metric_type] = adjusted_rand_score(
                     labels_true=inputs["true_subclass"], labels_pred=assignments
                 )
+            elif metric_type == "acc":
+                labels_true = inputs["true_subclass"]
+                total_acc, cluster_map = compute_optimal_assignments(
+                    labels_true=labels_true, labels_pred=assignments
+                )
+                metrics["total_acc"] = total_acc
+                for class_id, cluster_id in cluster_map.items():
+                    subgroup_acc = np.mean((labels_true == class_id) & (assignments == cluster_id))
+                    metrics[f"subgroup={class_id}.acc"] = subgroup_acc
+
             else:
                 raise KeyError(f"Unrecognized metric_type {metric_type}")
-            metrics[metric_type] = metric
         return metrics
 
     def train(self, cluster_model, inputs):

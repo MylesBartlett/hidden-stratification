@@ -50,7 +50,8 @@
         "model": "kmeans",
         "metric_types": [
             "ari",
-            "nmi"
+            "nmi",
+            "acc"
         ],
         "k": 5,
         "search_k": false,

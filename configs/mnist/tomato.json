@@ -50,9 +50,10 @@
         "model": "topograd",
         "metric_types": [
             "ari",
-            "nmi"
+            "nmi",
+            "acc"
         ],
-        "k": 4,
+        "k": 5,
         "search_k": false,
         "overcluster": false,
         "method_kwargs": {

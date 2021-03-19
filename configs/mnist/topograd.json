@@ -53,11 +53,11 @@
             "nmi",
             "acc"
         ],
-        "k": 4,
+        "k": 5,
         "search_k": false,
         "overcluster": false,
         "method_kwargs": {
-            "iters": 10,
+            "iters": 30,
             "k_rips": 30,
             "k_kde": 100,
             "merge_threshold": 0.5

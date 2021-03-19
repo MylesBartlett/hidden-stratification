@@ -112,26 +112,26 @@ class GEORGECluster:
                 continue
 
             cluster_model = deepcopy(orig_cluster_model)
-            activations = group_data["activations"]
+            train_activations = group_data["activations"]
 
             # Since the topological clustering algorithms are of the descriptive variety,
             # they need to be run on the test and val data to produce predictions for them.
             # For fair comparison, we do the same for the (predictive) baselines.
             val_activations = inputs_val[0][group]["activations"]
-            kwargs = {"split_sizes": (len(activations), len(val_activations))}
             test_activations = inputs_test[0][group]["activations"]
-            activations = np.concatenate([activations, val_activations, test_activations], axis=0)
+            all_activations = np.concatenate(
+                [train_activations, val_activations, test_activations], axis=0
+            )
             kwargs = {}
             if isinstance(cluster_model, TopoGradCluster):
-                val_activations = inputs_val[0][group]["activations"]
-                kwargs["split_sizes"] = (len(activations), len(val_activations))
+                kwargs["split_sizes"] = (len(train_activations), len(val_activations))
             elif extra_info:
                 losses = group_data["losses"]
                 kwargs["losses"] = losses
 
             # cluster
             self.logger.basic_info(f"Clustering superclass {group}...")
-            cluster_model = cluster_model.fit(activations, **kwargs)
+            cluster_model = cluster_model.fit(all_activations, **kwargs)
             if isinstance(cluster_model, TopoGradCluster):
                 pd_plot = cluster_model.plot()
                 wandb.log({f"pd_plot_[superclass={group}]": wandb.Image(pd_plot)})

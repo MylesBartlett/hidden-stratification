@@ -52,9 +52,9 @@
             "ari",
             "nmi"
         ],
-        "k": 4,
-        "search_k": true,
-        "overcluster": true,
+        "k": 5,
+        "search_k": false,
+        "overcluster": false,
         "method_kwargs": {}
     }
 }

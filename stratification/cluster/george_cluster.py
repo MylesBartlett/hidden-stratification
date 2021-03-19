@@ -124,7 +124,7 @@ class GEORGECluster:
             kwargs = {}
             if isinstance(cluster_model, TopoGradCluster):
                 val_activations = inputs_val[0][group]["activations"]
-                kwargs["split_indices"] = (len(activations), len(val_activations))
+                kwargs["split_sizes"] = (len(activations), len(val_activations))
             elif extra_info:
                 losses = group_data["losses"]
                 kwargs["losses"] = losses

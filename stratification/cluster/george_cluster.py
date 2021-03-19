@@ -69,9 +69,9 @@ class GEORGECluster:
                     labels_true=labels_true, labels_pred=assignments
                 )
                 metrics["acc"] = total_acc
-                for class_id, cluster_id in cluster_map.items():
+                for i, (class_id, cluster_id) in enumerate(cluster_map.items()):
                     subgroup_acc = np.mean((labels_true == class_id) & (assignments == cluster_id))
-                    metrics[f"{class_id}.acc"] = subgroup_acc
+                    metrics[f"{i}.acc"] = subgroup_acc
 
             else:
                 raise KeyError(f"Unrecognized metric_type {metric_type}")

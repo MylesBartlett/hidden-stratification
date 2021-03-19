@@ -68,10 +68,10 @@ class GEORGECluster:
                 total_acc, cluster_map = compute_optimal_assignments(
                     labels_true=labels_true, labels_pred=assignments
                 )
-                metrics["total_acc"] = total_acc
+                metrics["acc"] = total_acc
                 for class_id, cluster_id in cluster_map.items():
                     subgroup_acc = np.mean((labels_true == class_id) & (assignments == cluster_id))
-                    metrics[f"subgroup={class_id}.acc"] = subgroup_acc
+                    metrics[f"{class_id}.acc"] = subgroup_acc
 
             else:
                 raise KeyError(f"Unrecognized metric_type {metric_type}")

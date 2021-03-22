@@ -16,7 +16,8 @@ def visualize_clusters_by_group(
     save_dir=None,
 ):
     """
-    group_to_k (optional) allows standardization across splits, otherwise it will just use len(df['cluster'].unique())
+    group_to_k (optional) allows standardization across splits, otherwise it will just use
+    len(df['cluster'].unique())
     """
     data = {
         "x1": activations[:, 0],
@@ -51,8 +52,6 @@ def visualize_clusters_by_group(
             plt.title(plot_title_full)
             plt.xlabel("")
             plt.ylabel("")
-            g.get_figure().savefig(
-                os.path.join(save_dir, f"group_{group}_{plot_type}_viz.png"), dpi=300
-            )
-            g.get_figure().clf()
-            wandb.log({plot_title_full: wandb.Image(g.get_figure())})
+            save_path = os.path.join(save_dir, f"group_{group}_{plot_type}_viz.png")
+            g.get_figure().savefig(save_path, dpi=300)
+            wandb.log({plot_title_full: wandb.Image(save_path)})

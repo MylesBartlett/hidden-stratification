@@ -70,7 +70,8 @@ class GEORGECluster:
                 )
                 metrics["acc"] = total_acc
                 for i, (class_id, cluster_id) in enumerate(cluster_map.items()):
-                    subgroup_acc = np.mean((labels_true == class_id) & (assignments == cluster_id))
+                    class_mask = labels_true == class_id
+                    subgroup_acc = (class_mask & (assignments == cluster_id)) / class_mask.sum()
                     metrics[f"{i}.acc"] = subgroup_acc
 
             else:

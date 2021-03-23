@@ -14,6 +14,9 @@ import torch.nn as nn
 import torch.optim
 from tqdm import tqdm
 
+from .topograd_orig import topoclustergrad
+
+
 __all__ = [
     "rbf",
     "compute_rips",
@@ -168,6 +171,14 @@ def tomato(
         return entries, np.array([[0, 0]])
 
 
+def newI1(I1, sortrule):
+    newI1 = I1[sortrule]
+    for i in range(newI1.shape[0]):
+        for j in range(newI1.shape[1]):
+            newI1[i, j] = np.where(sortrule == newI1[i, j])[0][0]
+    return newI1
+
+
 class TopoGradFn(Function):
     @staticmethod
     def forward(
@@ -183,11 +194,11 @@ class TopoGradFn(Function):
         dists_kde, idxs_kde = compute_density_map(pc_np, k_kde, scale)
         dists_kde = dists_kde.astype(float)
         sorted_idxs = np.argsort(dists_kde)
-        idxs_kde_sorted = idxs_kde[sorted_idxs]
+        idxs_kde_sorted = newI1(idxs_kde, sorted_idxs)
         dists_kde_sorted = dists_kde[sorted_idxs]
         pc_np = pc_np[sorted_idxs]
         _, rips_idxs = compute_rips(pc_np, k_rips)
-        _, pers_pairs = cluster(dists_kde, rips_idxs, 1)
+        _, pers_pairs = cluster(dists_kde_sorted, rips_idxs, 1)
 
         see = np.array([elem for elem in pers_pairs if (elem != np.array([-1, -1])).any()])
         result = []
@@ -196,15 +207,17 @@ class TopoGradFn(Function):
             result.append([see[see[:, 0] == i][0, 0], max(see[see[:, 0] == i][:, 1])])
         result = np.array(result)
         pdpairs = result
-        oripd = dists_kde[result]
+
+        oripd = dists_kde_sorted[result]
         sorted_idxs = np.argsort(oripd[:, 0] - oripd[:, 1])
+
         changing = sorted_idxs[:-destnum]
-        nochanging = sorted_idxs[-destnum:]
+        nochanging = sorted_idxs[-destnum:-1]
         biggest = oripd[sorted_idxs[-1]]
         dest = np.array([biggest[0], biggest[1]])
         changepairs = pdpairs[changing]
         nochangepairs = pdpairs[nochanging]
-        pd11 = dists_kde[changepairs]
+        pd11 = dists_kde_sorted[changepairs]
         weakdist = np.sum(pd11[:, 0] - pd11[:, 1]) / np.sqrt(2)
         strongdist = np.sum(np.linalg.norm(dists_kde_sorted[nochangepairs] - dest, axis=1))
 
@@ -256,6 +269,15 @@ class TopoGradFn(Function):
         return grad_input, None, None, None, None
 
 
+def recover(xxx):
+    ffff = []
+    for i in range(len(xxx)):
+        ffff.append(np.where(xxx == i)[0][0])
+
+    ffff = np.array(ffff)
+    return ffff
+
+
 class TopoGradLoss(nn.Module):
     def __init__(self, k_kde: int, k_rips: int, scale: float, destnum: int) -> None:
         super().__init__()
@@ -265,7 +287,7 @@ class TopoGradLoss(nn.Module):
         self.destnum = destnum
 
     def forward(self, x: Tensor) -> Tensor:
-        return TopoGradFn.apply(x, self.k_kde, self.k_rips, self.scale, self.destnum)
+        return topoclustergrad.apply(x, self.k_kde, self.k_rips, self.scale, self.destnum)
 
 
 class TopoGradCluster:
@@ -279,10 +301,10 @@ class TopoGradCluster:
         k_kde: int = 10,
         k_rips: int = 10,
         scale: float = 0.5,
-        merge_threshold: float = 0.5,
+        merge_threshold: float = 1,
         iters: int = 100,
         lr: float = 1.0e-3,
-        optimizer_cls=torch.optim.SGD,
+        optimizer_cls=torch.optim.AdamW,
         **optimizer_kwargs: dict[str, Any],
     ) -> None:
         super().__init__()

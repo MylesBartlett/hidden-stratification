@@ -1,12 +1,8 @@
-from faiss import IndexFlatL2
-import faiss
-import jax
 from numba import jit
-from numba import cuda
-from numpy import array
 import numpy as np
-from numpy import argsort
 import torch
+
+from faiss import IndexFlatL2
 
 # pc is the dataset, which should be a point cloud
 # k1 is the number of neighbors of neighborhood graph

@@ -15,6 +15,7 @@ numpy
 opencv-python-headless
 pandas
 progress
+pykeops
 scikit-learn>=0.22.2.post1
 seaborn
 torchvision

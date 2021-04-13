@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 import math
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 import warnings
 
 import matplotlib.pyplot as plt
@@ -14,6 +14,7 @@ import torch.optim
 from tqdm import tqdm
 
 from faiss import IndexFlatL2
+from pykeops.torch import LazyTensor
 
 from .topograd_orig import topoclustergrad
 
@@ -28,12 +29,7 @@ __all__ = [
 ]
 
 
-def rbf(x: np.ndarray, y: np.ndarray, scale: float, axis: int = -1) -> np.ndarray:
-    "Compute the distance between two vectors using an RBF kernel."
-    return np.exp(-np.linalg.norm(x - y, axis=axis) ** 2 / scale)
-
-
-def compute_rips(pc: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
+def compute_rips_np(pc: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
     """"Compute the delta-Rips Graph."""
     pc = pc.astype(np.float32)
     cpuindex = IndexFlatL2(pc.shape[1])
@@ -42,7 +38,7 @@ def compute_rips(pc: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
     return cpuindex.search(pc, k)
 
 
-def compute_density_map(x: np.ndarray, k: int, scale: float) -> tuple[np.ndarray, np.ndarray]:
+def compute_density_map_np(x: np.ndarray, k: int, scale: float) -> tuple[np.ndarray, np.ndarray]:
     """Compute the k-nearest neighbours kernel density estimate."""
     x = x.astype(np.float32)
     index = IndexFlatL2(x.shape[1])
@@ -50,6 +46,37 @@ def compute_density_map(x: np.ndarray, k: int, scale: float) -> tuple[np.ndarray
     values, indexes = index.search(x, k)
     result = np.sum(np.exp(-values / scale), axis=1) / (k * scale)
     return result / max(result), indexes
+
+
+def pairwise_L2sqr(tensor_a: Tensor, tensor_b: Tensor) -> Tensor:
+    return (tensor_a - tensor_b) ** 2
+
+
+def knn(
+    pc: Tensor, k: int, kernel: Callable[[Tensor, Tensor], Tensor] = pairwise_L2sqr
+) -> tuple[Tensor, Tensor]:
+    G_i = LazyTensor(pc[:, None, :])  # (M**2, 1, 2)
+    X_j = LazyTensor(pc[None, :, :])  # (1, N, 2)
+    D_ij = kernel(G_i, X_j).sum(-1)  # (M**2, N) symbolic matrix of squared distances
+    indKNN = D_ij.argKmin(k, dim=1)  # Grid <-> Samples, (M**2, K) integer tensor
+    # Workaround for pykeops urrently not supporting differentiation through Kmin
+    to_nn_alt = kernel(pc[:, None], pc[indKNN, :]).sum(-1)
+
+    return to_nn_alt, indKNN
+
+
+def rbf(x: Tensor, y: Tensor, scale: float, dim: int = 1) -> Tensor:
+    return torch.exp(-torch.norm(x - y, dim=dim) ** 2 / scale)
+
+
+def compute_density_map(pc: Tensor, k: int, scale: float) -> tuple[Tensor, Tensor]:
+    dists, inds = knn(pc, k=k, kernel=pairwise_L2sqr)
+    dists = (-dists / scale).exp().sum(1) / (k * scale)
+    return dists / dists.max(), inds
+
+
+def compute_rips(pc: Tensor, k: int) -> Tensor:
+    return knn(pc=pc, k=k, kernel=pairwise_L2sqr)[1]
 
 
 @jit(nopython=True)
@@ -142,12 +169,12 @@ def tomato(
     """
     pc = pc.astype(float)
     #  Compute the k-NN KDE
-    density_map, _ = compute_density_map(pc, k_kde, scale)
+    density_map, _ = compute_density_map_np(pc, k_kde, scale)
     density_map = density_map.astype(np.float32)
     sorted_idxs = np.argsort(density_map)
     density_map_sorted = density_map[sorted_idxs]
     pc = pc[sorted_idxs]
-    _, rips_idxs = compute_rips(pc, k=k_rips)
+    _, rips_idxs = compute_rips_np(pc, k=k_rips)
     entries, pers_pairs = cluster(density_map_sorted, rips_idxs, threshold=threshold)
     if threshold == 1:
         see = np.array([elem for elem in pers_pairs if (elem != np.array([-1, -1])).any()])

@@ -1,18 +1,19 @@
 from __future__ import annotations
 import logging
-from typing import Any, Literal, Optional, Tuple, cast
+import math
+from typing import Any, Literal
 import warnings
 
-from faiss import IndexFlatL2
 import matplotlib.pyplot as plt
 from numba import jit
 import numpy as np
 import torch
 from torch import Tensor
-from torch.autograd import Function
 import torch.nn as nn
 import torch.optim
 from tqdm import tqdm
+
+from faiss import IndexFlatL2
 
 from .topograd_orig import topoclustergrad
 
@@ -179,103 +180,53 @@ def newI1(I1, sortrule):
     return newI1
 
 
-class TopoGradFn(Function):
-    @staticmethod
-    def forward(
-        ctx: Any,
-        pc: Tensor,
-        k_kde: int,
-        k_rips: int,
-        scale: float,
-        destnum: int,
-        **kwargs,
-    ) -> Tensor:
-        pc_np = pc.detach().cpu().numpy()
-        dists_kde, idxs_kde = compute_density_map(pc_np, k_kde, scale)
-        dists_kde = dists_kde.astype(float)
-        sorted_idxs = np.argsort(dists_kde)
-        idxs_kde_sorted = newI1(idxs_kde, sorted_idxs)
-        dists_kde_sorted = dists_kde[sorted_idxs]
-        pc_np = pc_np[sorted_idxs]
-        _, rips_idxs = compute_rips(pc_np, k_rips)
-        _, pers_pairs = cluster(dists_kde_sorted, rips_idxs, 1)
+def topograd_loss(pc: Tensor, k_kde: int, k_rips: int, scale: float, destnum: int) -> Tensor:
+    kde_dists, _ = compute_density_map(pc, k_kde, scale)
 
-        see = np.array([elem for elem in pers_pairs if (elem != np.array([-1, -1])).any()])
-        result = []
+    sorted_idxs = torch.argsort(kde_dists, descending=False)
+    kde_dists_sorted = kde_dists[sorted_idxs]
+    pc_sorted = pc[sorted_idxs]
 
-        for i in np.unique(see[:, 0]):
-            result.append([see[see[:, 0] == i][0, 0], max(see[see[:, 0] == i][:, 1])])
-        result = np.array(result)
-        pdpairs = result
+    rips_idxs = compute_rips(pc_sorted, k_rips)
+    _, pers_pairs = cluster(
+        density_map=kde_dists_sorted.detach().cpu().numpy(),
+        rips_idxs=rips_idxs.cpu().numpy(),
+        threshold=1.0,
+    )
 
-        oripd = dists_kde_sorted[result]
-        sorted_idxs = np.argsort(oripd[:, 0] - oripd[:, 1])
+    pers_pairs = torch.as_tensor(pers_pairs, device=pc.device)
+    seen = pers_pairs[~torch.all(pers_pairs == -1, dim=1)]
 
-        changing = sorted_idxs[:-destnum]
-        nochanging = sorted_idxs[-destnum:-1]
-        biggest = oripd[sorted_idxs[-1]]
-        dest = np.array([biggest[0], biggest[1]])
-        changepairs = pdpairs[changing]
-        nochangepairs = pdpairs[nochanging]
-        pd11 = dists_kde_sorted[changepairs]
-        weakdist = np.sum(pd11[:, 0] - pd11[:, 1]) / np.sqrt(2)
-        strongdist = np.sum(np.linalg.norm(dists_kde_sorted[nochangepairs] - dest, axis=1))
-
-        ctx.pc = pc_np
-        ctx.idxs_kde = idxs_kde_sorted
-        ctx.dists_kde = dists_kde_sorted
-        ctx.scale = scale
-        ctx.changepairs = changepairs
-        ctx.nochangepairs = nochangepairs
-        ctx.dest = dest
-
-        return torch.as_tensor(weakdist + strongdist)
-
-    @staticmethod
-    def backward(ctx: Any, grad_output: Tensor) -> Tuple[Optional[Tensor], ...]:
-        pc = ctx.pc
-        idxs_kde = ctx.idxs_kde
-        dists_kde = ctx.dists_kde
-        scale = ctx.scale
-        changepairs = ctx.changepairs
-        nochangepairs = ctx.nochangepairs
-        dest = ctx.dest
-        grad_input = cast(np.ndarray, np.zeros_like(pc))
-
-        #  Compute the gradient for changing pairs
-        pc_cp_tiled = pc[changepairs][:, :, None]
-        coeff_cp_pre = np.sqrt(2) / len(changepairs)  # type: ignore
-        coeff_cp = coeff_cp_pre * rbf(
-            x=pc_cp_tiled, y=pc[idxs_kde[changepairs]], scale=scale, axis=-1
+    pd_pairs = []
+    for i in torch.unique(seen[:, 0]):
+        pd_pairs.append(
+            [
+                seen[torch.where(seen[:, 0] == i)[0]][0, 0],
+                max(seen[torch.where(seen[:, 0] == i)[0]][:, 1]),
+            ]
         )
-        direction_cp = pc_cp_tiled - pc[idxs_kde[changepairs]]
-        grad_cp = direction_cp * coeff_cp[..., None]
-        grad_cp[:, 1] *= -1
-        grad_input[idxs_kde[changepairs]] = grad_cp
-
-        #  Compute the gradient for non-changing pairs
-        dists = dists_kde[nochangepairs] - dest
-        coeff_ncp_pre = (1 / np.linalg.norm(dists) * dists / scale / len(nochangepairs))[..., None]
-        pc_ncp_tiled = pc[nochangepairs][:, :, None]
-        coeff_ncp = coeff_ncp_pre * rbf(
-            x=pc_ncp_tiled, y=pc[idxs_kde[nochangepairs]], scale=scale, axis=-1
+    if not pd_pairs:
+        print(
+            "FIltering failed to yield any persistence pairs required for computation of "
+            "the topological loss. Returning 0 instead."
         )
-        direction_ncp = pc_ncp_tiled - pc[idxs_kde[nochangepairs]]
-        grad_ncp = direction_ncp * coeff_ncp[..., None]
-        grad_input[idxs_kde[nochangepairs]] = grad_ncp
+        return pc.new_zeros(())
+    pd_pairs = torch.as_tensor(pd_pairs, device=pc.device)
+    oripd = kde_dists_sorted[pd_pairs]
+    pers_idxs_sorted = torch.argsort(oripd[:, 0] - oripd[:, 1])
 
-        grad_input = torch.as_tensor(grad_input)
+    changing = pers_idxs_sorted[:-destnum]
+    nochanging = pers_idxs_sorted[-destnum:-1]
 
-        return grad_input, None, None, None, None
+    biggest = oripd[pers_idxs_sorted[-1]]
+    dest = torch.as_tensor([biggest[0], biggest[1]], device=pc.device)
+    changepairs = pd_pairs[changing]
+    nochangepairs = pd_pairs[nochanging]
+    pd11 = kde_dists_sorted[changepairs]
 
-
-def recover(xxx):
-    ffff = []
-    for i in range(len(xxx)):
-        ffff.append(np.where(xxx == i)[0][0])
-
-    ffff = np.array(ffff)
-    return ffff
+    weakdist = torch.sum(pd11[:, 0] - pd11[:, 1]) / math.sqrt(2)
+    strongdist = torch.sum(torch.norm(kde_dists_sorted[nochangepairs] - dest, dim=1))
+    return weakdist + strongdist
 
 
 class TopoGradLoss(nn.Module):
@@ -287,7 +238,10 @@ class TopoGradLoss(nn.Module):
         self.destnum = destnum
 
     def forward(self, x: Tensor) -> Tensor:
-        return topoclustergrad.apply(x, self.k_kde, self.k_rips, self.scale, self.destnum)
+        return topograd_loss(
+            pc=x, k_kde=self.k_kde, k_rips=self.k_rips, scale=self.scale, destnum=self.destnum
+        )
+        # return topoclustergrad.apply(x, self.k_kde, self.k_rips, self.scale, self.destnum)
 
 
 class TopoGradCluster:

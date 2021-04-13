@@ -22,9 +22,9 @@ __all__ = [
     "rbf",
     "compute_rips",
     "compute_density_map",
-    "TopoGradFn",
     "TopoGradLoss",
     "TopoGradCluster",
+    "topograd_loss",
 ]
 
 
